@@ -21,9 +21,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm ci
+      - run: npm install --no-fund --no-audit
       - run: npm run build
-      - run: cp dist/index.html dist/404.html   # 👈 SPA fallback
+      - run: cp dist/index.html dist/404.html   # SPA fallback
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

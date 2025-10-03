@@ -22,7 +22,6 @@ Thumbs.db
 *.log
 
 # Lockfiles
-package-lock.json
 pnpm-lock.yaml
 yarn.lock
 
