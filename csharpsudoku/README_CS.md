@@ -1,8 +1,8 @@
-#Instrucciones rápidas
+#Instrucciones rapidas
 
 //Requisitos
 
-//Windows 10/11
+//  Windows 10/11
 
 //.NET 8 SDK
 
@@ -12,13 +12,13 @@
 //cd minisudokuweb/csharpsudoku
 
 
-//Reemplaza el contenido de Program.cs con el código completo de abajo.
+//Reemplaza el contenido de Program.cs con el codigo completo de abajo.
 
 //Compila y publica como .exe de un solo archivo
 
 //dotnet publish -c Release -r win-x64 /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
 
 
-#El ejecutable quedará en:
+#El ejecutable quedara en:
 
 //MiniSudoku\bin\Release\net8.0-windows\win-x64\publish\MiniSudoku.exe
