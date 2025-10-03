@@ -1,7 +1,7 @@
 {
   "name": "Sudoku Boxed",
   "short_name": "Sudoku",
-  "description": "Sudoku 4x4 y 6x6 — PWA offline.",
+  "description": "Sudoku 4x4 y 6x6 ï¿½ PWA offline.",
   "theme_color": "#0f172a",
   "background_color": "#0f172a",
   "display": "standalone",
