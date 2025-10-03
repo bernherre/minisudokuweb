@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MiniSudoku Web (4×4 / 6×6)</title>
+  <style>
+    :root {
+      --bg: #0f172a; /* slate-900 */
+      --panel: #111827; /* gray-900 */
+      --text: #e5e7eb; /* gray-200 */
+      --muted: #9ca3af; /* gray-400 */
+      --accent: #22c55e; /* green-500 */
+      --danger: #ef4444; /* red-500 */
+      --warn: #f59e0b; /* amber-500 */
+      --cell: #111827; /* grid bg */
+      --cell-fixed: #1f2937; /* gray-800 */
+      --cell-ok: #064e3b; /* green-900 */
+      --cell-bad: #7f1d1d; /* red-900 */
+      --cell-hint: #1f2937; /* gray-800 */
+      --border: #374151; /* gray-700 */
+    }
+
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 50% -20%, #1f2937 0%, var(--bg) 55%);
+      color: var(--text);
+      display: grid;
+      place-items: start center;
+      padding: 24px;
+    }
+
+    .app {
+      width: min(980px, 96vw);
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      padding: 16px;
+      backdrop-filter: blur(6px);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+    }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+    select, button {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    button { cursor: pointer; }
+    button.primary { border-color: #10b981; }
+    button.danger { border-color: var(--danger); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+
+    .status {
+      display: flex; gap: 14px; justify-content: flex-end; align-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .grid-wrap { display: grid; justify-items: center; }
+
+    .grid {
+      display: grid;
+      gap: 0;
+      background: var(--border);
+      padding: 6px;
+      border-radius: 12px;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .cell {
+      width: clamp(44px, 7.5vw, 60px);
+      height: clamp(44px, 7.5vw, 60px);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: clamp(18px, 2.4vw, 28px);
+      border: 1px solid var(--border);
+      background: var(--cell);
+      color: var(--text);
+    }
+
+    .fixed { background: var(--cell-fixed); color: #cbd5e1; }
+    .ok { background: var(--cell-ok); }
+    .bad { background: var(--cell-bad); }
+    .hint { background: var(--cell-hint); color: #a7f3d0; }
+
+    .bold-top    { border-top-width: 3px; }
+    .bold-left   { border-left-width: 3px; }
+    .bold-right  { border-right-width: 3px; }
+    .bold-bottom { border-bottom-width: 3px; }
+
+    .footer { text-align: center; color: var(--muted); font-size: 12px; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #0b1220; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React 18 + Babel standalone (para JSX sin build). Adecuado para demo / GitHub Pages. -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    // ============================
+    //  Motor de Sudoku (4x4, 6x6)
+    // ============================
+    class SudokuEngine {
+      constructor(size = 4, seed = null) {
+        if (![4, 6].includes(size)) throw new Error('Solo 4x4 o 6x6');
+        this.N = size;
+        if (size === 4) { this.boxRows = 2; this.boxCols = 2; }
+        else { this.boxRows = 2; this.boxCols = 3; }
+        this._seed = seed ?? Math.floor(Math.random() * 1e9);
+        this._rng = this._seeded(this._seed);
+      }
+      _seeded(seed) { // LCG simple suficiente para puzzles pequeños
+        let s = Number(seed) || 1;
+        return () => (s = (s * 48271) % 0x7fffffff) / 0x7fffffff;
+      }
+      _shuffle(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(this._rng() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+      clone(grid) { return grid.map(row => row.slice()); }
+      emptyGrid() { return Array.from({length: this.N}, () => Array(this.N).fill(0)); }
+
+      isValidPlacement(grid, r, c, v) {
+        const N = this.N;
+        if (v < 1 || v > N) return false;
+        for (let i=0;i<N;i++) {
+          if (grid[r][i] === v) return false;
+          if (grid[i][c] === v) return false;
+        }
+        const sr = Math.floor(r / this.boxRows) * this.boxRows;
+        const sc = Math.floor(c / this.boxCols) * this.boxCols;
+        for (let rr = 0; rr < this.boxRows; rr++)
+          for (let cc = 0; cc < this.boxCols; cc++)
+            if (grid[sr+rr][sc+cc] === v) return false;
+        return true;
+      }
+
+      _findEmpty(grid) {
+        for (let r=0;r<this.N;r++) for (let c=0;c<this.N;c++) if (grid[r][c]===0) return [r,c];
+        return null;
+      }
+
+      solve(grid) { // backtracking
+        const pos = this._findEmpty(grid);
+        if (!pos) return true;
+        const [r,c] = pos;
+        const candidates = this._shuffle([...Array(this.N)].map((_,i)=>i+1));
+        for (const v of candidates) {
+          if (this.isValidPlacement(grid, r, c, v)) {
+            grid[r][c] = v;
+            if (this.solve(grid)) return true;
+            grid[r][c] = 0;
+          }
+        }
+        return false;
+      }
+
+      countSolutions(grid, limit=2) {
+        let count = 0;
+        const dfs = () => {
+          if (count >= limit) return;
+          const pos = this._findEmpty(grid);
+          if (!pos) { count++; return; }
+          const [r,c] = pos;
+          for (let v=1; v<=this.N && count<limit; v++) {
+            if (this.isValidPlacement(grid, r, c, v)) {
+              grid[r][c] = v; dfs(); grid[r][c] = 0;
+            }
+          }
+        };
+        dfs();
+        return count;
+      }
+
+      generateSolved() {
+        const g = this.emptyGrid();
+        this.solve(g);
+        return g;
+      }
+
+      generatePuzzle(clues) {
+        const solved = this.generateSolved();
+        const puzzle = this.clone(solved);
+        const cells = [...Array(this.N * this.N).keys()];
+        const order = this._shuffle(cells);
+        const countFilled = (grid) => grid.flat().filter(x=>x!==0).length;
+
+        for (const idx of order) {
+          if (countFilled(puzzle) <= clues) break;
+          const r = Math.floor(idx / this.N);
+          const c = idx % this.N;
+          const backup = puzzle[r][c];
+          if (backup === 0) continue;
+          puzzle[r][c] = 0;
+          const test = this.clone(puzzle);
+          const solutions = this.countSolutions(test, 2);
+          if (solutions !== 1) puzzle[r][c] = backup; // mantener unicidad
+        }
+        return { puzzle, solved };
+      }
+
+      isCompleteAndValid(grid) {
+        const N = this.N;
+        // Filas y columnas
+        for (let r=0;r<N;r++) {
+          const row = new Set();
+          const col = new Set();
+          for (let c=0;c<N;c++) {
+            const vr = grid[r][c];
+            const vc = grid[c][r];
+            if (vr<1 || vr>N || row.has(vr)) return false; row.add(vr);
+            if (vc<1 || vc>N || col.has(vc)) return false; col.add(vc);
+          }
+        }
+        // Cajas
+        for (let br=0;br<N;br+=this.boxRows) for (let bc=0;bc<N;bc+=this.boxCols) {
+          const box = new Set();
+          for (let r=0;r<this.boxRows;r++) for (let c=0;c<this.boxCols;c++) {
+            const v = grid[br+r][bc+c];
+            if (v<1 || v>N || box.has(v)) return false; box.add(v);
+          }
+        }
+        return true;
+      }
+    }
+
+    // ==================================
+    // Utilidades
+    // ==================================
+    const DIFFICULTY = {
+      "Fácil": (N) => [Math.floor(N*N*0.65), Math.floor(N*N*0.80)],
+      "Media": (N) => [Math.floor(N*N*0.50), Math.floor(N*N*0.65)],
+      "Difícil": (N) => [Math.floor(N*N*0.35), Math.floor(N*N*0.50)],
+    };
+
+    const useInterval = (cb, ms) => {
+      React.useEffect(() => { const id = setInterval(cb, ms); return () => clearInterval(id); }, [cb, ms]);
+    };
+
+    const pad = (n) => (n<10?`0${n}`:`${n}`);
+    const fmtTime = (ms) => {
+      const sec = Math.floor(ms/1000); const m = Math.floor(sec/60); const s = sec%60; return `${pad(m)}:${pad(s)}`;
+    };
+
+    // ==================================
+    // Componentes React
+    // ==================================
+    function App() {
+      const [size, setSize] = React.useState(4); // 4 o 6
+      const [difficulty, setDifficulty] = React.useState("Media");
+      const [engine, setEngine] = React.useState(() => new SudokuEngine(4));
+      const [puzzle, setPuzzle] = React.useState(() => engine.generatePuzzle(DIFFICULTY["Media"](4)[1]));
+      const [grid, setGrid] = React.useState(() => puzzle.puzzle.map(r => r.slice()));
+      const [solution, setSolution] = React.useState(() => puzzle.solved.map(r => r.slice()));
+      const [fixed, setFixed] = React.useState(() => puzzle.puzzle.map(row => row.map(v => v!==0)));
+      const [feedback, setFeedback] = React.useState({}); // {"r,c": 'ok' | 'bad' | 'hint'}
+      const [startAt, setStartAt] = React.useState(Date.now());
+      const [now, setNow] = React.useState(Date.now());
+      const [won, setWon] = React.useState(false);
+
+      useInterval(() => setNow(Date.now()), 500);
+
+      const N = size;
+      const boxRows = (size===4)?2:2;
+      const boxCols = (size===4)?2:3;
+
+      const resetGame = React.useCallback((newSize = size, newDifficulty = difficulty) => {
+        const eng = new SudokuEngine(newSize);
+        const [mi, ma] = DIFFICULTY[newDifficulty](newSize);
+        const clues = Math.floor((mi + ma) / 2);
+        const pack = eng.generatePuzzle(clues);
+        setEngine(eng);
+        setSize(newSize);
+        setDifficulty(newDifficulty);
+        setPuzzle(pack);
+        setGrid(pack.puzzle.map(r => r.slice()));
+        setSolution(pack.solved.map(r => r.slice()));
+        setFixed(pack.puzzle.map(row => row.map(v => v!==0)));
+        setFeedback({});
+        setStartAt(Date.now());
+        setWon(false);
+      }, [size, difficulty]);
+
+      const onSizeChange = (e) => resetGame(Number(e.target.value), difficulty);
+      const onDifficultyChange = (e) => resetGame(size, e.target.value);
+
+      const setValue = (r,c,v) => {
+        if (fixed[r][c]) return; // celda fija
+        const ng = grid.map(row => row.slice());
+        ng[r][c] = v;
+        setGrid(ng);
+        const key = `${r},${c}`;
+        setFeedback(f => ({...f, [key]: v===0?undefined:(solution[r][c]===v?'ok':'bad')}));
+      };
+
+      const handleCellInput = (r,c,raw) => {
+        const ch = String(raw||'').trim();
+        if (ch === '') { setValue(r,c,0); return; }
+        if (!/^\d$/.test(ch)) return;
+        const v = parseInt(ch,10);
+        if (v<1 || v>size) return;
+        setValue(r,c,v);
+      };
+
+      const handleCheck = () => {
+        // Marca todas las celdas correctas/incorrectas; si todo ok → ganar
+        let anyBad = false, anyEmpty = false;
+        const fb = {};
+        for (let r=0;r<N;r++) for (let c=0;c<N;c++) {
+          if (grid[r][c]===0) { anyEmpty=true; continue; }
+          const key = `${r},${c}`;
+          fb[key] = (grid[r][c]===solution[r][c]) ? 'ok' : 'bad';
+          if (fb[key]==='bad') anyBad=true;
+        }
+        setFeedback(fb);
+        if (!anyBad && !anyEmpty) {
+          // Validación final fuerte
+          if (new SudokuEngine(N).isCompleteAndValid(grid)) {
+            setWon(true);
+          }
+        }
+      };
+
+      const handleSolve = () => {
+        setGrid(solution.map(r => r.slice()));
+        const fb = {};
+        for (let r=0;r<N;r++) for (let c=0;c<N;c++) fb[`${r},${c}`] = fixed[r][c]?'fixed':'ok';
+        setFeedback(fb); setWon(true);
+      };
+
+      const handleClear = () => {
+        const ng = grid.map((row,r) => row.map((v,c) => fixed[r][c]?v:0));
+        setGrid(ng); setFeedback({}); setWon(false); setStartAt(Date.now());
+      };
+
+      const elapsed = now - startAt;
+
+      return (
+        <div className="app">
+          <div className="card toolbar">
+            <div className="controls">
+              <label> Tamaño:&nbsp;
+                <select value={size} onChange={onSizeChange}>
+                  <option value={4}>4×4</option>
+                  <option value={6}>6×6</option>
+                </select>
+              </label>
+              <label> Dificultad:&nbsp;
+                <select value={difficulty} onChange={onDifficultyChange}>
+                  {Object.keys(DIFFICULTY).map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </label>
+              <button className="primary" onClick={() => resetGame(size, difficulty)}>Nuevo</button>
+              <button onClick={handleCheck}>Verificar</button>
+              <button onClick={handleSolve}>Resolver</button>
+              <button className="danger" onClick={handleClear}>Limpiar</button>
+            </div>
+            <div className="status">
+              <span>Tiempo: <span className="kbd">{fmtTime(elapsed)}</span></span>
+              {won && <span style={{color: 'var(--accent)'}}>¡Completado! 🎉</span>}
+            </div>
+          </div>
+
+          <div className="card grid-wrap">
+            <SudokuGrid
+              grid={grid}
+              fixed={fixed}
+              size={size}
+              boxRows={boxRows}
+              boxCols={boxCols}
+              feedback={feedback}
+              onInput={handleCellInput}
+            />
+          </div>
+
+          <div className="footer">Hecho con React. Sugerencia: usa teclas del 1–{size} para ingresar valores; <span className="kbd">Backspace</span> para borrar.</div>
+        </div>
+      );
+    }
+
+    function SudokuGrid({ grid, fixed, size, boxRows, boxCols, feedback, onInput }) {
+      const style = {
+        gridTemplateColumns: `repeat(${size}, 1fr)`,
+        gridTemplateRows: `repeat(${size}, 1fr)`,
+      };
+      return (
+        <div className="grid" style={style} onKeyDown={(e)=>e.stopPropagation()}>
+          {grid.map((row, r) => row.map((v,c) => {
+            const classes = ["cell"];
+            if (fixed[r][c]) classes.push("fixed");
+            const f = feedback[`${r},${c}`];
+            if (f === 'ok') classes.push('ok');
+            else if (f === 'bad') classes.push('bad');
+            else if (f === 'hint') classes.push('hint');
+
+            // Bordes gruesos de cajas
+            if (r % boxRows === 0) classes.push('bold-top');
+            if (c % boxCols === 0) classes.push('bold-left');
+            if (r === size-1) classes.push('bold-bottom');
+            if (c === size-1) classes.push('bold-right');
+
+            const onClick = () => {
+              // focus logic handled by contenteditable; handled on keydown too
+            };
+
+            return (
+              <Cell
+                key={`${r}-${c}`}
+                r={r} c={c} v={v}
+                editable={!fixed[r][c]}
+                classes={classes.join(' ')}
+                onInput={onInput}
+                size={size}
+              />
+            );
+          }))}
+        </div>
+      );
+    }
+
+    function Cell({ r, c, v, editable, classes, onInput, size }) {
+      const ref = React.useRef(null);
+
+      React.useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const handleKey = (e) => {
+          if (!editable) return;
+          if (e.key === 'Backspace' || e.key === 'Delete') { onInput(r,c,''); e.preventDefault(); return; }
+          if (/^[0-9]$/.test(e.key)) { onInput(r,c,e.key); e.preventDefault(); return; }
+        };
+        el.addEventListener('keydown', handleKey);
+        return () => el.removeEventListener('keydown', handleKey);
+      }, [editable, onInput, r, c, size]);
+
+      return (
+        <div
+          ref={ref}
+          className={classes}
+          role={editable?"textbox":"note"}
+          aria-label={`fila ${r+1}, columna ${c+1}`}
+          tabIndex={0}
+          onClick={(e)=>e.currentTarget.focus()}
+        >
+          {v!==0 ? v : ''}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App/>);
+  </script>
+</body>
+</html>
