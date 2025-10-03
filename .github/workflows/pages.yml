@@ -22,10 +22,8 @@ jobs:
         with:
           node-version: '20'
       - run: npm ci
-      - name: Set VITE_BASE
-        run: echo "VITE_BASE=/${{ github.event.repository.name }}/" >> $GITHUB_ENV
       - run: npm run build
-      - run: cp dist/index.html dist/404.html
+      - run: cp dist/index.html dist/404.html   # 👈 SPA fallback
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
