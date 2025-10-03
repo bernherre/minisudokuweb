@@ -18,15 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # sin lockfile: usa npm install
+      # Sin lockfile: usa install (no ci)
       - run: npm install --no-fund --no-audit
 
-      # build Vite (si estás usando base './', no hace falta VITE_BASE)
+      # Build Vite
       - run: npm run build
 
       # SPA fallback y desactivar Jekyll en el artefacto
