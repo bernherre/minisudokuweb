@@ -21,21 +21,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      # Sin lockfile: usa install (no ci)
-      - run: npm install --no-fund --no-audit
-
-      # Build Vite
+      - run: npm install --no-fund --no-audit   # usa install si no tienes package-lock
       - run: npm run build
-
-      # SPA fallback y desactivar Jekyll en el artefacto
-      - run: cp dist/index.html dist/404.html
-      - run: touch dist/.nojekyll
-
+      - run: cp dist/index.html dist/404.html   # SPA fallback      # bloquea Jekyll por si acaso
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-
   deploy:
     needs: build
     runs-on: ubuntu-latest
