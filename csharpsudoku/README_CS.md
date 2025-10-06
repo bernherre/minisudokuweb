@@ -1,24 +1,24 @@
 #Instrucciones rápidas
 
-//Requisitos
+#Requisitos
 
-//Windows 10/11
+-Windows 10/11
 
-//.NET 8 SDK
+-.NET 8 SDK
 
-//Crear el proyecto
+#Crear el proyecto
 
-//dotnet new winforms -n MiniSudoku -f net8.0-windows
-//cd minisudokuweb/csharpsudoku
+-dotnet new winforms -n MiniSudoku -f net8.0-windows
+-cd minisudokuweb/csharpsudoku
 
 
-//Reemplaza el contenido de Program.cs con el código completo de abajo.
+-Reemplaza el contenido de Program.cs con el código completo de abajo.
 
-//Compila y publica como .exe de un solo archivo
+-Compila y publica como .exe de un solo archivo
 
-//dotnet publish -c Release -r win-x64 /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
+-dotnet publish -c Release -r win-x64 /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
 
 
 #El ejecutable quedará en:
 
-//MiniSudoku\bin\Release\net8.0-windows\win-x64\publish\MiniSudoku.exe
+-MiniSudoku\bin\Release\net8.0-windows\win-x64\publish\MiniSudoku.exe
